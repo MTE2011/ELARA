@@ -10,17 +10,32 @@ module.exports = {
                 .setRequired(false)),
     
     async execute(interaction, client) {
-        const config = client.db.getServerConfig(interaction.guild.id);
+        const user = interaction.options.getUser('user') || interaction.user;
+        await this.showRank(interaction, user, client);
+    },
 
-        if (!config.levelingEnabled) {
-            return interaction.reply({
-                content: '❌ Leveling system is not enabled on this server.',
-                ephemeral: true
-            });
+    async executePrefix(message, args, client) {
+        const userMention = args[0];
+        const userId = userMention ? userMention.replace(/[<@!>]/g, '') : message.author.id;
+        const user = await client.users.fetch(userId).catch(() => null);
+
+        if (!user) {
+            return message.reply('❌ Invalid user provided.');
         }
 
-        const user = interaction.options.getUser('user') || interaction.user;
-        const userData = client.db.getUserLevel(interaction.guild.id, user.id);
+        await this.showRank(message, user, client);
+    },
+
+    async showRank(context, user, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
+
+        if (!config.levelingEnabled) {
+            const msg = '❌ Leveling system is not enabled on this server.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
+        }
+
+        const userData = client.db.getUserLevel(guildId, user.id);
 
         // Calculate XP needed for next level
         const currentLevelXp = Math.pow((userData.level / 0.1), 2);
@@ -28,7 +43,7 @@ module.exports = {
         const xpNeeded = Math.floor(nextLevelXp - userData.xp);
 
         // Get user rank
-        const leaderboard = client.db.getLeaderboard(interaction.guild.id, 100);
+        const leaderboard = client.db.getLeaderboard(guildId, 100);
         const rank = leaderboard.findIndex(entry => entry.userId === user.id) + 1;
 
         const rankEmbed = new EmbedBuilder()
@@ -44,6 +59,10 @@ module.exports = {
             .setThumbnail(user.displayAvatarURL({ dynamic: true }))
             .setTimestamp();
 
-        await interaction.reply({ embeds: [rankEmbed] });
+        if (context.reply) {
+            await context.reply({ embeds: [rankEmbed] });
+        } else {
+            await context.reply({ embeds: [rankEmbed] });
+        }
     }
 };

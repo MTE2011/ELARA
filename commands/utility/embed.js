@@ -4,77 +4,80 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('embed')
         .setDescription('Create a custom embed')
-        .addStringOption(option =>
-            option.setName('title')
-                .setDescription('Embed title')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('description')
-                .setDescription('Embed description')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('color')
-                .setDescription('Embed color (hex code, e.g., #5865F2)')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('footer')
-                .setDescription('Embed footer text')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('image')
-                .setDescription('Image URL')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('thumbnail')
-                .setDescription('Thumbnail URL')
-                .setRequired(false))
-        .addChannelOption(option =>
-            option.setName('channel')
-                .setDescription('Channel to send the embed (leave empty for current channel)')
-                .setRequired(false))
+        .addStringOption(option => option.setName('title').setDescription('Embed title').setRequired(false))
+        .addStringOption(option => option.setName('description').setDescription('Embed description').setRequired(false))
+        .addStringOption(option => option.setName('color').setDescription('Embed color (hex code, e.g., #5865F2)').setRequired(false))
+        .addStringOption(option => option.setName('footer').setDescription('Embed footer text').setRequired(false))
+        .addStringOption(option => option.setName('image').setDescription('Image URL').setRequired(false))
+        .addStringOption(option => option.setName('thumbnail').setDescription('Thumbnail URL').setRequired(false))
+        .addChannelOption(option => option.setName('channel').setDescription('Channel to send the embed').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     
     permissions: PermissionFlagsBits.ManageMessages,
     
     async execute(interaction, client) {
         const config = client.db.getServerConfig(interaction.guild.id);
-        
-        const title = interaction.options.getString('title');
-        const description = interaction.options.getString('description');
-        const color = interaction.options.getString('color') || config.embedColor;
-        const footer = interaction.options.getString('footer');
-        const image = interaction.options.getString('image');
-        const thumbnail = interaction.options.getString('thumbnail');
-        const channel = interaction.options.getChannel('channel') || interaction.channel;
+        const data = {
+            title: interaction.options.getString('title'),
+            description: interaction.options.getString('description'),
+            color: interaction.options.getString('color') || config.embedColor,
+            footer: interaction.options.getString('footer'),
+            image: interaction.options.getString('image'),
+            thumbnail: interaction.options.getString('thumbnail'),
+            channel: interaction.options.getChannel('channel') || interaction.channel
+        };
+        await this.sendEmbed(interaction, data);
+    },
 
-        if (!title && !description) {
-            return interaction.reply({
-                content: '❌ You must provide at least a title or description.',
-                ephemeral: true
-            });
+    async executePrefix(message, args, client) {
+        // Usage: embed "Title" "Description" [#channel] [color]
+        if (args.length < 1) {
+            return message.reply('❌ Usage: `embed "Title" "Description" [#channel] [color]`');
         }
 
-        const embed = new EmbedBuilder()
-            .setColor(color);
+        const config = client.db.getServerConfig(message.guild.id);
+        const data = {
+            title: args[0],
+            description: args[1]?.replace(/\\n/g, '\n'),
+            channel: message.guild.channels.cache.get(args[2]?.replace(/[<#>]/g, '')) || message.channel,
+            color: args[3] || config.embedColor
+        };
 
-        if (title) embed.setTitle(title);
-        if (description) embed.setDescription(description);
-        if (footer) embed.setFooter({ text: footer });
-        if (image) embed.setImage(image);
-        if (thumbnail) embed.setThumbnail(thumbnail);
+        await this.sendEmbed(message, data);
+    },
+
+    async sendEmbed(context, data) {
+        if (!data.title && !data.description) {
+            const msg = '❌ You must provide at least a title or description.';
+            return context.reply ? (context.ephemeral ? context.reply({ content: msg, ephemeral: true }) : context.reply(msg)) : context.reply(msg);
+        }
+
+        const embed = new EmbedBuilder().setColor(data.color);
+        if (data.title) embed.setTitle(data.title);
+        if (data.description) embed.setDescription(data.description);
+        if (data.footer) embed.setFooter({ text: data.footer });
+        if (data.image) embed.setImage(data.image);
+        if (data.thumbnail) embed.setThumbnail(data.thumbnail);
 
         try {
-            await channel.send({ embeds: [embed] });
-            
-            await interaction.reply({
-                content: `✅ Embed sent to ${channel}`,
-                ephemeral: true
-            });
+            await data.channel.send({ embeds: [embed] });
+            const successMsg = `✅ Embed sent to ${data.channel}`;
+            if (context.reply) {
+                if (context.ephemeral) {
+                    await context.reply({ content: successMsg, ephemeral: true });
+                } else {
+                    await context.reply(successMsg);
+                }
+            }
         } catch (error) {
-            await interaction.reply({
-                content: '❌ Failed to send embed. Make sure I have permission to send messages in that channel.',
-                ephemeral: true
-            });
+            const errorMsg = '❌ Failed to send embed. Check my permissions.';
+            if (context.reply) {
+                if (context.ephemeral) {
+                    await context.reply({ content: errorMsg, ephemeral: true });
+                } else {
+                    await context.reply(errorMsg);
+                }
+            }
         }
     }
 };

@@ -7,8 +7,17 @@ module.exports = {
     
     async execute(interaction, client) {
         const config = client.db.getServerConfig(interaction.guild.id);
-        const guild = interaction.guild;
+        const embed = this.getEmbed(interaction.guild, config);
+        await interaction.reply({ embeds: [embed] });
+    },
 
+    async executePrefix(message, args, client) {
+        const config = client.db.getServerConfig(message.guild.id);
+        const embed = this.getEmbed(message.guild, config);
+        await message.reply({ embeds: [embed] });
+    },
+
+    getEmbed(guild, config) {
         const serverEmbed = new EmbedBuilder()
             .setTitle(`📊 ${guild.name} - Server Information`)
             .setThumbnail(guild.iconURL({ dynamic: true }))
@@ -28,7 +37,6 @@ module.exports = {
         if (guild.description) {
             serverEmbed.setDescription(guild.description);
         }
-
-        await interaction.reply({ embeds: [serverEmbed] });
+        return serverEmbed;
     }
 };

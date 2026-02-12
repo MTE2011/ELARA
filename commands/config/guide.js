@@ -10,97 +10,75 @@ module.exports = {
     
     async execute(interaction, client) {
         const config = client.db.getServerConfig(interaction.guild.id);
+        const prefix = config.prefix || client.config.prefix || '!';
+        const embed = this.getGuideEmbed(interaction.guild, config, prefix);
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+    },
 
-        const guideEmbed = new EmbedBuilder()
+    async executePrefix(message, args, client) {
+        const config = client.db.getServerConfig(message.guild.id);
+        const prefix = config.prefix || client.config.prefix || '!';
+        const embed = this.getGuideEmbed(message.guild, config, prefix);
+        await message.reply({ embeds: [embed] });
+    },
+
+    getGuideEmbed(guild, config, prefix) {
+        return new EmbedBuilder()
             .setTitle('🌙 Elara Setup Guide')
             .setDescription(
-                'Welcome to Elara! Follow this guide to set up all the features.\n\n' +
+                `Welcome to Elara! Follow this guide to set up all the features. You can use prefix commands (e.g., \`${prefix}set\`) or slash commands.\n\n` +
                 '**Getting Started:**\n' +
-                'All configuration is done through the `/set` command. Only server owners or users with the Administrator permission can configure the bot.'
+                `All configuration is done through the \`${prefix}set\` command. Only server owners or users with the Administrator permission can configure the bot.`
             )
             .setColor(config.embedColor)
             .addFields(
                 {
                     name: '🎫 Ticket System Setup',
                     value: 
-                        '1. Create a category for tickets\n' +
-                        '2. `/set ticket-category <category>` - Set the ticket category\n' +
-                        '3. `/set ticket-log-channel <channel>` - Set log channel (optional)\n' +
-                        '4. `/set ticket-support-role <role>` - Set support role (optional)\n' +
-                        '5. `/set ticket-enabled true` - Enable the system\n' +
-                        '6. `/ticket-setup <channel>` - Send the ticket panel',
-                    inline: false
-                },
-                {
-                    name: '🔗 Anti-Link System Setup',
-                    value:
-                        '1. `/set antilink-enabled true` - Enable anti-link\n' +
-                        '2. Configure whitelist and bypass roles in database if needed',
-                    inline: false
-                },
-                {
-                    name: '🤝 Partnership System Setup',
-                    value:
-                        '1. Create a channel for partnership requests\n' +
-                        '2. `/set partnership-channel <channel>` - Set partnership channel\n' +
-                        '3. `/set partnership-enabled true` - Enable the system\n' +
-                        '4. Users can now use `/partner` to submit requests',
+                        `1. Create a category for tickets\n` +
+                        `2. \`${prefix}set ticket-category <category_id>\`\n` +
+                        `3. \`${prefix}set ticket-log-channel <#channel>\`\n` +
+                        `4. \`${prefix}set ticket-support-role <@role>\`\n` +
+                        `5. \`${prefix}set ticket-enabled true\`\n` +
+                        `6. \`${prefix}ticket-setup <#channel>\``,
                     inline: false
                 },
                 {
                     name: '📜 Rules System Setup',
                     value:
-                        '1. `/rules-add <rule>` - Add rules (repeat for each rule)\n' +
-                        '2. `/set rules-role <role>` - Set the role given after accepting\n' +
-                        '3. `/set rules-enabled true` - Enable the system\n' +
-                        '4. `/rules-setup <channel>` - Post the rules panel',
+                        `1. \`${prefix}rules-add <rule_text>\` (repeat for each rule)\n` +
+                        `2. \`${prefix}set rules-role <@role>\`\n` +
+                        `3. \`${prefix}set rules-enabled true\`\n` +
+                        `4. \`${prefix}rules-setup <#channel>\``,
                     inline: false
                 },
                 {
                     name: '👋 Welcome/Leave System Setup',
                     value:
-                        '1. `/set welcome-channel <channel>` - Set welcome channel\n' +
-                        '2. `/set welcome-enabled true` - Enable welcome messages\n' +
-                        '3. `/set leave-channel <channel>` - Set leave channel\n' +
-                        '4. `/set leave-enabled true` - Enable leave messages',
-                    inline: false
-                },
-                {
-                    name: '🎉 Giveaway System Setup',
-                    value:
-                        '1. `/set giveaway-enabled true` - Enable giveaways\n' +
-                        '2. Use `/giveaway-start` to create giveaways',
+                        `1. \`${prefix}set welcome-channel <#channel>\`\n` +
+                        `2. \`${prefix}set welcome-enabled true\`\n` +
+                        `3. \`${prefix}set leave-channel <#channel>\`\n` +
+                        `4. \`${prefix}set leave-enabled true\``,
                     inline: false
                 },
                 {
                     name: '🛡️ Moderation System Setup',
                     value:
-                        '1. `/set moderation-log-channel <channel>` - Set log channel\n' +
-                        '2. `/set moderation-enabled true` - Enable moderation\n' +
-                        '3. Use `/warn`, `/timeout`, `/kick`, `/ban` commands',
+                        `1. \`${prefix}set moderation-log-channel <#channel>\`\n` +
+                        `2. \`${prefix}set moderation-enabled true\`\n` +
+                        `3. Use \`${prefix}warn\`, \`${prefix}timeout\`, \`${prefix}kick\`, \`${prefix}ban\``,
                     inline: false
                 },
                 {
                     name: '📊 Leveling System Setup',
                     value:
-                        '1. `/set leveling-channel <channel>` - Set level-up channel (optional)\n' +
-                        '2. `/set leveling-enabled true` - Enable leveling\n' +
-                        '3. Users gain XP by chatting and can check `/rank`',
-                    inline: false
-                },
-                {
-                    name: '📝 Important Notes',
-                    value:
-                        '• Make sure Elara has proper permissions in all channels\n' +
-                        '• Place Elara\'s role above other roles for moderation\n' +
-                        '• Test each system after setup to ensure it works\n' +
-                        '• Use `/help` to see all available commands',
+                        `1. \`${prefix}set leveling-channel <#channel>\`\n` +
+                        `2. \`${prefix}set leveling-enabled true\`\n` +
+                        `3. Check rank with \`${prefix}rank\``,
                     inline: false
                 }
             )
-            .setFooter({ text: 'Need more help? Contact the bot developer' })
+            .setFooter({ text: `Use ${prefix}help to see all commands` })
             .setTimestamp();
-
-        await interaction.reply({ embeds: [guideEmbed], ephemeral: true });
     }
 };

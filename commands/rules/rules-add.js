@@ -14,18 +14,33 @@ module.exports = {
     
     async execute(interaction, client) {
         const rule = interaction.options.getString('rule');
-        const config = client.db.getServerConfig(interaction.guild.id);
+        await this.addRule(interaction, rule, client);
+    },
+
+    async executePrefix(message, args, client) {
+        const rule = args.join(' ');
+        if (!rule) {
+            return message.reply('❌ Usage: `rules-add <rule text>`');
+        }
+        await this.addRule(message, rule, client);
+    },
+
+    async addRule(context, rule, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
 
         const currentRules = config.rulesContent || [];
         currentRules.push(rule);
 
-        client.db.updateServerConfig(interaction.guild.id, {
+        client.db.updateServerConfig(guildId, {
             rulesContent: currentRules
         });
 
-        await interaction.reply({
-            content: `✅ Rule #${currentRules.length} has been added:\n> ${rule}`,
-            ephemeral: true
-        });
+        const successMsg = `✅ Rule #${currentRules.length} has been added:\n> ${rule}`;
+        if (context.reply) {
+            await context.reply(successMsg);
+        } else {
+            await context.reply({ content: successMsg, ephemeral: true });
+        }
     }
 };

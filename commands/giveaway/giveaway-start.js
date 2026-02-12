@@ -25,49 +25,62 @@ module.exports = {
     permissions: PermissionFlagsBits.ManageGuild,
     
     async execute(interaction, client) {
-        const config = client.db.getServerConfig(interaction.guild.id);
+        const data = {
+            prize: interaction.options.getString('prize'),
+            duration: interaction.options.getInteger('duration'),
+            winners: interaction.options.getInteger('winners'),
+            channel: interaction.options.getChannel('channel') || interaction.channel
+        };
+        await this.start(interaction, data, client);
+    },
+
+    async executePrefix(message, args, client) {
+        if (args.length < 3) {
+            return message.reply('❌ Usage: `giveaway-start <prize> <duration_mins> <winners> [#channel]`');
+        }
+
+        const data = {
+            prize: args[0],
+            duration: parseInt(args[1]),
+            winners: parseInt(args[2]),
+            channel: message.guild.channels.cache.get(args[3]?.replace(/[<#>]/g, '')) || message.channel
+        };
+
+        if (isNaN(data.duration) || isNaN(data.winners)) {
+            return message.reply('❌ Duration and winners must be numbers.');
+        }
+
+        await this.start(message, data, client);
+    },
+
+    async start(context, data, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
 
         if (!config.giveawayEnabled) {
-            return interaction.reply({
-                content: '❌ Giveaway system is not enabled on this server.',
-                ephemeral: true
-            });
+            const msg = '❌ Giveaway system is not enabled. Use `set giveaway-enabled true` first.';
+            return context.reply ? (context.ephemeral ? context.reply({ content: msg, ephemeral: true }) : context.reply(msg)) : context.reply(msg);
         }
 
-        const prize = interaction.options.getString('prize');
-        const duration = interaction.options.getInteger('duration');
-        const winners = interaction.options.getInteger('winners');
-        const channel = interaction.options.getChannel('channel') || interaction.channel;
-
-        if (duration < 1) {
-            return interaction.reply({
-                content: '❌ Duration must be at least 1 minute.',
-                ephemeral: true
-            });
+        if (data.duration < 1) {
+            const msg = '❌ Duration must be at least 1 minute.';
+            return context.reply ? (context.ephemeral ? context.reply({ content: msg, ephemeral: true }) : context.reply(msg)) : context.reply(msg);
         }
 
-        if (winners < 1) {
-            return interaction.reply({
-                content: '❌ There must be at least 1 winner.',
-                ephemeral: true
-            });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        const endTime = Date.now() + (duration * 60 * 1000);
+        const endTime = Date.now() + (data.duration * 60 * 1000);
+        const user = context.user || context.author;
 
         const giveawayEmbed = new EmbedBuilder()
             .setTitle('🎉 GIVEAWAY 🎉')
             .setDescription(
-                `**Prize:** ${prize}\n\n` +
-                `**Winners:** ${winners}\n` +
+                `**Prize:** ${data.prize}\n\n` +
+                `**Winners:** ${data.winners}\n` +
                 `**Ends:** <t:${Math.floor(endTime / 1000)}:R>\n` +
-                `**Hosted by:** ${interaction.user}\n\n` +
+                `**Hosted by:** ${user}\n\n` +
                 `Click the button below to enter!`
             )
             .setColor(config.embedColor)
-            .setFooter({ text: `${winners} winner(s) | Ends` })
+            .setFooter({ text: `${data.winners} winner(s) | Ends` })
             .setTimestamp(endTime);
 
         const row = new ActionRowBuilder()
@@ -80,39 +93,50 @@ module.exports = {
             );
 
         try {
-            const message = await channel.send({ embeds: [giveawayEmbed], components: [row] });
+            const message = await data.channel.send({ embeds: [giveawayEmbed], components: [row] });
 
             // Save giveaway to database
-            client.db.addGiveaway(interaction.guild.id, message.id, {
+            client.db.addGiveaway(guildId, message.id, {
                 messageId: message.id,
-                channelId: channel.id,
-                prize: prize,
-                winners: winners,
+                channelId: data.channel.id,
+                prize: data.prize,
+                winners: data.winners,
                 endTime: endTime,
-                hostId: interaction.user.id,
+                hostId: user.id,
                 entries: [],
                 ended: false
             });
 
-            await interaction.editReply({
-                content: `✅ Giveaway started in ${channel}!`
-            });
+            const successMsg = `✅ Giveaway started in ${data.channel}!`;
+            if (context.reply) {
+                if (context.deferred || context.replied) {
+                    await context.editReply({ content: successMsg });
+                } else {
+                    await context.reply({ content: successMsg, ephemeral: true });
+                }
+            }
 
             // Schedule giveaway end
             setTimeout(async () => {
-                await endGiveaway(message.id, interaction.guild.id, client);
-            }, duration * 60 * 1000);
+                await endGiveaway(message.id, guildId, client);
+            }, data.duration * 60 * 1000);
 
         } catch (error) {
-            await interaction.editReply({
-                content: '❌ Failed to start giveaway. Make sure I have permission to send messages in that channel.'
-            });
+            const errorMsg = '❌ Failed to start giveaway. Make sure I have permission to send messages in that channel.';
+            if (context.reply) {
+                if (context.deferred || context.replied) {
+                    await context.editReply({ content: errorMsg });
+                } else {
+                    await context.reply({ content: errorMsg, ephemeral: true });
+                }
+            }
         }
     }
 };
 
 async function endGiveaway(messageId, guildId, client) {
-    const giveaway = client.db.getGiveaways(guildId)[messageId];
+    const giveaways = client.db.getGiveaways(guildId);
+    const giveaway = giveaways ? giveaways[messageId] : null;
     
     if (!giveaway || giveaway.ended) return;
 
@@ -136,7 +160,6 @@ async function endGiveaway(messageId, guildId, client) {
             return;
         }
 
-        // Select random winners
         const winnerCount = Math.min(giveaway.winners, giveaway.entries.length);
         const winners = [];
         const entriesCopy = [...giveaway.entries];

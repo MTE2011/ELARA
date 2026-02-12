@@ -17,68 +17,82 @@ module.exports = {
     permissions: PermissionFlagsBits.ModerateMembers,
     
     async execute(interaction, client) {
-        const config = client.db.getServerConfig(interaction.guild.id);
-
-        if (!config.moderationEnabled) {
-            return interaction.reply({
-                content: '❌ Moderation system is not enabled on this server.',
-                ephemeral: true
-            });
-        }
-
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
-        const member = interaction.guild.members.cache.get(user.id);
+        await this.warn(interaction, user, reason, client);
+    },
 
+    async executePrefix(message, args, client) {
+        const userMention = args[0];
+        const reason = args.slice(1).join(' ');
+
+        if (!userMention || !reason) {
+            return message.reply('❌ Usage: `warn <@user> <reason>`');
+        }
+
+        const userId = userMention.replace(/[<@!>]/g, '');
+        const user = await client.users.fetch(userId).catch(() => null);
+
+        if (!user) {
+            return message.reply('❌ Invalid user provided.');
+        }
+
+        await this.warn(message, user, reason, client);
+    },
+
+    async warn(context, user, reason, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
+
+        if (!config.moderationEnabled) {
+            const msg = '❌ Moderation system is not enabled on this server.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
+        }
+
+        const member = context.guild.members.cache.get(user.id);
         if (!member) {
-            return interaction.reply({
-                content: '❌ User not found in this server.',
-                ephemeral: true
-            });
+            const msg = '❌ User not found in this server.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        if (member.id === interaction.user.id) {
-            return interaction.reply({
-                content: '❌ You cannot warn yourself.',
-                ephemeral: true
-            });
+        const moderator = context.member || context.author;
+        const moderatorId = moderator.id;
+
+        if (member.id === moderatorId) {
+            const msg = '❌ You cannot warn yourself.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        if (member.id === client.user.id) {
-            return interaction.reply({
-                content: '❌ I cannot warn myself.',
-                ephemeral: true
-            });
-        }
-
-        if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({
-                content: '❌ You cannot warn this user (role hierarchy).',
-                ephemeral: true
-            });
+        if (member.roles.highest.position >= context.member.roles.highest.position && context.guild.ownerId !== moderatorId) {
+            const msg = '❌ You cannot warn this user (role hierarchy).';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         // Add warning
-        client.db.addWarning(interaction.guild.id, user.id, {
+        client.db.addWarning(guildId, user.id, {
             reason: reason,
-            moderator: interaction.user.id,
+            moderator: moderatorId,
             timestamp: Date.now()
         });
 
-        const warnings = client.db.getWarnings(interaction.guild.id, user.id);
+        const warnings = client.db.getWarnings(guildId, user.id);
 
         const warnEmbed = new EmbedBuilder()
             .setTitle('⚠️ User Warned')
             .setDescription(
                 `**User:** ${user.tag}\n` +
-                `**Moderator:** ${interaction.user.tag}\n` +
+                `**Moderator:** ${moderator.user ? moderator.user.tag : moderator.tag}\n` +
                 `**Reason:** ${reason}\n` +
                 `**Total Warnings:** ${warnings.length}`
             )
             .setColor('#FFA500')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [warnEmbed] });
+        if (context.reply) {
+            await context.reply({ embeds: [warnEmbed] });
+        } else {
+            await context.reply({ embeds: [warnEmbed] });
+        }
 
         // Try to DM user
         try {
@@ -87,22 +101,20 @@ module.exports = {
                     new EmbedBuilder()
                         .setTitle('⚠️ You have been warned')
                         .setDescription(
-                            `You have been warned in **${interaction.guild.name}**\n\n` +
+                            `You have been warned in **${context.guild.name}**\n\n` +
                             `**Reason:** ${reason}\n` +
-                            `**Moderator:** ${interaction.user.tag}\n` +
+                            `**Moderator:** ${moderator.user ? moderator.user.tag : moderator.tag}\n` +
                             `**Total Warnings:** ${warnings.length}`
                         )
                         .setColor('#FFA500')
                         .setTimestamp()
                 ]
             });
-        } catch (error) {
-            // User has DMs disabled
-        }
+        } catch (error) {}
 
         // Log to moderation channel
         if (config.moderationLogChannelId) {
-            const logChannel = interaction.guild.channels.cache.get(config.moderationLogChannelId);
+            const logChannel = context.guild.channels.cache.get(config.moderationLogChannelId);
             if (logChannel) {
                 await logChannel.send({ embeds: [warnEmbed] });
             }

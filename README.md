@@ -1,6 +1,6 @@
 # 🌙 Elara - Discord Management Bot
 
-Elara is a powerful, feature-rich Discord bot designed to help you manage and automate your Discord server. With a clean, modular architecture and comprehensive features, Elara is perfect for medium to large servers.
+Elara is a powerful, feature-rich Discord bot designed to help you manage and automate your Discord server. It supports both **Slash Commands** and **Prefix Commands**, featuring a clean, modular architecture perfect for medium to large servers.
 
 ## ✨ Features
 

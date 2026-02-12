@@ -24,79 +24,102 @@ module.exports = {
     cooldown: 3600, // 1 hour cooldown
     
     async execute(interaction, client) {
-        const config = client.db.getServerConfig(interaction.guild.id);
+        const data = {
+            serverName: interaction.options.getString('server-name'),
+            inviteLink: interaction.options.getString('invite-link'),
+            memberCount: interaction.options.getInteger('member-count'),
+            description: interaction.options.getString('description')
+        };
+        await this.submit(interaction, data, client);
+    },
+
+    async executePrefix(message, args, client) {
+        // Simple prefix parsing: partner "Server Name" "Invite" "Count" "Description"
+        // Or just partner <name> <invite> <count> <desc...>
+        if (args.length < 4) {
+            return message.reply('❌ Usage: `partner <server-name> <invite-link> <member-count> <description>`');
+        }
+
+        const data = {
+            serverName: args[0],
+            inviteLink: args[1],
+            memberCount: parseInt(args[2]),
+            description: args.slice(3).join(' ')
+        };
+
+        if (isNaN(data.memberCount)) {
+            return message.reply('❌ Member count must be a number.');
+        }
+
+        await this.submit(message, data, client);
+    },
+
+    async submit(context, data, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
 
         if (!config.partnershipEnabled) {
-            return interaction.reply({
-                content: '❌ Partnership system is not enabled on this server.',
-                ephemeral: true
-            });
+            const msg = '❌ Partnership system is not enabled on this server.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         if (!config.partnershipChannelId) {
-            return interaction.reply({
-                content: '❌ Partnership channel is not configured. Please contact an administrator.',
-                ephemeral: true
-            });
+            const msg = '❌ Partnership channel is not configured. Please contact an administrator.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        const serverName = interaction.options.getString('server-name');
-        const inviteLink = interaction.options.getString('invite-link');
-        const memberCount = interaction.options.getInteger('member-count');
-        const description = interaction.options.getString('description');
-
         // Validate invite link
-        if (!inviteLink.includes('discord.gg/') && !inviteLink.includes('discord.com/invite/')) {
-            return interaction.reply({
-                content: '❌ Please provide a valid Discord invite link.',
-                ephemeral: true
-            });
+        if (!data.inviteLink.includes('discord.gg/') && !data.inviteLink.includes('discord.com/invite/')) {
+            const msg = '❌ Please provide a valid Discord invite link.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         // Check minimum member requirement
-        if (memberCount < config.partnershipRequirements.minMembers) {
-            return interaction.reply({
-                content: `❌ Your server must have at least ${config.partnershipRequirements.minMembers} members to partner.`,
-                ephemeral: true
-            });
+        if (data.memberCount < config.partnershipRequirements.minMembers) {
+            const msg = `❌ Your server must have at least ${config.partnershipRequirements.minMembers} members to partner.`;
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        const partnershipChannel = interaction.guild.channels.cache.get(config.partnershipChannelId);
+        const partnershipChannel = context.guild.channels.cache.get(config.partnershipChannelId);
         if (!partnershipChannel) {
-            return interaction.reply({
-                content: '❌ Partnership channel not found. Please contact an administrator.',
-                ephemeral: true
-            });
+            const msg = '❌ Partnership channel not found. Please contact an administrator.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        const user = context.user || context.author;
 
         try {
             const partnerEmbed = new EmbedBuilder()
-                .setTitle(`🤝 Partnership Request: ${serverName}`)
-                .setDescription(description)
+                .setTitle(`🤝 Partnership Request: ${data.serverName}`)
+                .setDescription(data.description)
                 .addFields(
-                    { name: '👥 Members', value: memberCount.toString(), inline: true },
-                    { name: '🔗 Invite', value: `[Join Server](${inviteLink})`, inline: true },
-                    { name: '📝 Submitted by', value: `${interaction.user.tag}`, inline: true }
+                    { name: '👥 Members', value: data.memberCount.toString(), inline: true },
+                    { name: '🔗 Invite', value: `[Join Server](${data.inviteLink})`, inline: true },
+                    { name: '📝 Submitted by', value: `${user.tag}`, inline: true }
                 )
                 .setColor(config.embedColor)
                 .setTimestamp()
-                .setFooter({ text: `Partnership Request • ${serverName}` });
+                .setFooter({ text: `Partnership Request • ${data.serverName}` });
 
-            const message = await partnershipChannel.send({
+            await partnershipChannel.send({
                 content: config.partnershipRoleId ? `<@&${config.partnershipRoleId}>` : '',
                 embeds: [partnerEmbed]
             });
 
-            await interaction.editReply({
-                content: '✅ Your partnership request has been submitted! Our team will review it soon.'
-            });
+            const successMsg = '✅ Your partnership request has been submitted! Our team will review it soon.';
+            if (context.reply) {
+                await context.reply(successMsg);
+            } else {
+                await context.reply({ content: successMsg, ephemeral: true });
+            }
 
         } catch (error) {
-            await interaction.editReply({
-                content: '❌ Failed to submit partnership request. Please try again later.'
-            });
+            const errorMsg = '❌ Failed to submit partnership request. Please try again later.';
+            if (context.reply) {
+                await context.reply(errorMsg);
+            } else {
+                await context.reply({ content: errorMsg, ephemeral: true });
+            }
         }
     }
 };

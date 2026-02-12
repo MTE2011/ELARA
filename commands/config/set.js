@@ -94,6 +94,11 @@ module.exports = {
                 .setName('leveling-channel')
                 .setDescription('Set the channel for level-up messages')
                 .addChannelOption(option => option.setName('channel').setDescription('Leveling channel').setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('prefix')
+                .setDescription('Set the command prefix for this server')
+                .addStringOption(option => option.setName('value').setDescription('New prefix').setRequired(true)))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     
     permissions: PermissionFlagsBits.Administrator,
@@ -157,6 +162,9 @@ module.exports = {
             case 'leveling-channel':
                 updates.levelingChannelId = interaction.options.getChannel('channel').id;
                 break;
+            case 'prefix':
+                updates.prefix = interaction.options.getString('value');
+                break;
         }
 
         client.db.updateServerConfig(interaction.guild.id, updates);
@@ -165,5 +173,83 @@ module.exports = {
             content: `✅ Configuration updated: **${subcommand}**`,
             ephemeral: true
         });
+    },
+
+    async executePrefix(message, args, client) {
+        if (args.length < 2) {
+            return message.reply('❌ Usage: `set <setting> <value>`\nExample: `set ticket-enabled true`');
+        }
+
+        const setting = args[0].toLowerCase();
+        const value = args[1];
+        const updates = {};
+
+        // Helper to get ID from mention or raw ID
+        const getId = (val) => val.replace(/[<@&#>!]/g, '');
+
+        switch (setting) {
+            case 'ticket-enabled':
+                updates.ticketEnabled = value === 'true';
+                break;
+            case 'ticket-category':
+                updates.ticketCategoryId = getId(value);
+                break;
+            case 'ticket-log-channel':
+                updates.ticketLogChannelId = getId(value);
+                break;
+            case 'ticket-support-role':
+                updates.ticketSupportRoleId = getId(value);
+                break;
+            case 'antilink-enabled':
+                updates.antiLinkEnabled = value === 'true';
+                break;
+            case 'partnership-enabled':
+                updates.partnershipEnabled = value === 'true';
+                break;
+            case 'partnership-channel':
+                updates.partnershipChannelId = getId(value);
+                break;
+            case 'rules-enabled':
+                updates.rulesEnabled = value === 'true';
+                break;
+            case 'rules-role':
+                updates.rulesAcceptRoleId = getId(value);
+                break;
+            case 'welcome-enabled':
+                updates.welcomeEnabled = value === 'true';
+                break;
+            case 'welcome-channel':
+                updates.welcomeChannelId = getId(value);
+                break;
+            case 'leave-enabled':
+                updates.leaveEnabled = value === 'true';
+                break;
+            case 'leave-channel':
+                updates.leaveChannelId = getId(value);
+                break;
+            case 'giveaway-enabled':
+                updates.giveawayEnabled = value === 'true';
+                break;
+            case 'moderation-enabled':
+                updates.moderationEnabled = value === 'true';
+                break;
+            case 'moderation-log-channel':
+                updates.moderationLogChannelId = getId(value);
+                break;
+            case 'leveling-enabled':
+                updates.levelingEnabled = value === 'true';
+                break;
+            case 'leveling-channel':
+                updates.levelingChannelId = getId(value);
+                break;
+            case 'prefix':
+                updates.prefix = value;
+                break;
+            default:
+                return message.reply(`❌ Unknown setting: \`${setting}\``);
+        }
+
+        client.db.updateServerConfig(message.guild.id, updates);
+        await message.reply(`✅ Configuration updated: **${setting}**`);
     }
 };

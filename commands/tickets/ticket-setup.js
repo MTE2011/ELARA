@@ -14,20 +14,33 @@ module.exports = {
     
     async execute(interaction, client) {
         const channel = interaction.options.getChannel('channel');
-        const config = client.db.getServerConfig(interaction.guild.id);
+        await this.setup(interaction, channel, client);
+    },
+
+    async executePrefix(message, args, client) {
+        const channelMention = args[0];
+        const channelId = channelMention ? channelMention.replace(/[<#>]/g, '') : message.channel.id;
+        const channel = message.guild.channels.cache.get(channelId);
+
+        if (!channel) {
+            return message.reply('❌ Invalid channel provided.');
+        }
+
+        await this.setup(message, channel, client);
+    },
+
+    async setup(context, channel, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
 
         if (!config.ticketEnabled) {
-            return interaction.reply({
-                content: '❌ Ticket system is not enabled. Use `/set ticket-enabled true` first.',
-                ephemeral: true
-            });
+            const msg = '❌ Ticket system is not enabled. Use `set ticket-enabled true` first.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         if (!config.ticketCategoryId) {
-            return interaction.reply({
-                content: '❌ Ticket category is not set. Use `/set ticket-category <category>` first.',
-                ephemeral: true
-            });
+            const msg = '❌ Ticket category is not set. Use `set ticket-category <category>` first.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
@@ -61,15 +74,19 @@ module.exports = {
         try {
             await channel.send({ embeds: [embed], components: [row] });
             
-            await interaction.reply({
-                content: `✅ Ticket panel has been sent to ${channel}`,
-                ephemeral: true
-            });
+            const successMsg = `✅ Ticket panel has been sent to ${channel}`;
+            if (context.reply) {
+                await context.reply(successMsg);
+            } else {
+                await context.reply({ content: successMsg, ephemeral: true });
+            }
         } catch (error) {
-            await interaction.reply({
-                content: '❌ Failed to send ticket panel. Make sure I have permission to send messages in that channel.',
-                ephemeral: true
-            });
+            const errorMsg = '❌ Failed to send ticket panel. Make sure I have permission to send messages in that channel.';
+            if (context.reply) {
+                await context.reply(errorMsg);
+            } else {
+                await context.reply({ content: errorMsg, ephemeral: true });
+            }
         }
     }
 };

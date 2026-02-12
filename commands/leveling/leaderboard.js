@@ -10,27 +10,33 @@ module.exports = {
                 .setRequired(false)),
     
     async execute(interaction, client) {
-        const config = client.db.getServerConfig(interaction.guild.id);
+        const page = interaction.options.getInteger('page') || 1;
+        await this.showLeaderboard(interaction, page, client);
+    },
+
+    async executePrefix(message, args, client) {
+        const page = parseInt(args[0]) || 1;
+        await this.showLeaderboard(message, page, client);
+    },
+
+    async showLeaderboard(context, page, client) {
+        const guildId = context.guild.id;
+        const config = client.db.getServerConfig(guildId);
 
         if (!config.levelingEnabled) {
-            return interaction.reply({
-                content: '❌ Leveling system is not enabled on this server.',
-                ephemeral: true
-            });
+            const msg = '❌ Leveling system is not enabled on this server.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
-        const page = interaction.options.getInteger('page') || 1;
         const perPage = 10;
         const start = (page - 1) * perPage;
 
-        const leaderboard = client.db.getLeaderboard(interaction.guild.id, 100);
+        const leaderboard = client.db.getLeaderboard(guildId, 100);
         const pageData = leaderboard.slice(start, start + perPage);
 
         if (pageData.length === 0) {
-            return interaction.reply({
-                content: '❌ No data found for this page.',
-                ephemeral: true
-            });
+            const msg = '❌ No data found for this page.';
+            return context.reply ? context.reply(msg) : context.reply({ content: msg, ephemeral: true });
         }
 
         const leaderboardText = pageData.map((entry, index) => {
@@ -40,12 +46,16 @@ module.exports = {
         }).join('\n');
 
         const leaderboardEmbed = new EmbedBuilder()
-            .setTitle(`🏆 ${interaction.guild.name} Leaderboard`)
+            .setTitle(`🏆 ${context.guild.name} Leaderboard`)
             .setDescription(leaderboardText)
             .setColor(config.embedColor)
             .setFooter({ text: `Page ${page} • Total users: ${leaderboard.length}` })
             .setTimestamp();
 
-        await interaction.reply({ embeds: [leaderboardEmbed] });
+        if (context.reply) {
+            await context.reply({ embeds: [leaderboardEmbed] });
+        } else {
+            await context.reply({ embeds: [leaderboardEmbed] });
+        }
     }
 };
