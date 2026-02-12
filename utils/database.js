@@ -109,14 +109,14 @@ class Database {
             // Welcome System
             welcomeEnabled: false,
             welcomeChannelId: null,
-            welcomeMessage: 'Welcome {user} to {server}!',
+            welcomeMessage: 'Welcome @user to @svname!',
             welcomeRoleId: null,
             welcomeDM: false,
             
             // Leave System
             leaveEnabled: false,
             leaveChannelId: null,
-            leaveMessage: '{user} has left the server.',
+            leaveMessage: '@user has left the server.',
             
             // Giveaway System
             giveawayEnabled: false,

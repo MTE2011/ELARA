@@ -36,7 +36,7 @@ Elara is a powerful, feature-rich Discord bot designed to help you manage and au
 ### 👋 Welcome & Leave System
 - Customizable welcome messages
 - Customizable leave messages
-- Support for placeholders (username, server name, member count)
+- Support for placeholders (@user, @svname, @count, @time)
 - Auto-role assignment on join
 - Optional welcome DMs
 

@@ -173,15 +173,15 @@ Create a channel for welcome messages (e.g., #welcome)
 Edit `data/server-configs.json`:
 ```json
 {
-  "welcomeMessage": "Welcome {user} to {server}! We now have {membercount} members! 🎉"
+  "welcomeMessage": "Welcome @user to @svname! We now have @count members! 🎉"
 }
 ```
 
 **Available placeholders:**
-- `{user}` - Mentions the user
-- `{username}` - User's username
-- `{server}` - Server name
-- `{membercount}` - Total member count
+- `@user` - Mentions the user
+- `@svname` - Server name
+- `@count` - Total member count
+- `@time` - Current time when joining/leaving
 
 ### Leave System
 
@@ -198,7 +198,7 @@ Create a channel for leave messages (e.g., #goodbye)
 Edit `data/server-configs.json`:
 ```json
 {
-  "leaveMessage": "{user} has left {server}. We now have {membercount} members."
+  "leaveMessage": "@user has left @svname. We now have @count members."
 }
 ```
 

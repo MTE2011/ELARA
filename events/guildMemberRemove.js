@@ -14,6 +14,11 @@ module.exports = {
                 try {
                     // Replace placeholders
                     let leaveMessage = config.leaveMessage
+                        .replace(/@user/g, member.user.tag)
+                        .replace(/@svname/g, member.guild.name)
+                        .replace(/@count/g, member.guild.memberCount.toString())
+                        .replace(/@time/g, `<t:${Math.floor(Date.now() / 1000)}:F>`)
+                        // Legacy support
                         .replace(/{user}/g, member.user.tag)
                         .replace(/{username}/g, member.user.username)
                         .replace(/{server}/g, member.guild.name)
